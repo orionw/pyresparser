@@ -34,6 +34,7 @@ class ResumeParser(object):
             'company_names': None,
             'no_of_pages': None,
             'total_experience': None,
+            'raw_text': None,
         }
         self.__resume = resume
         if not isinstance(self.__resume, io.BytesIO):
@@ -66,6 +67,7 @@ class ResumeParser(object):
         #               [sent.string.strip() for sent in self.__nlp.sents]
         #       )
         entities = utils.extract_entity_sections_grad(self.__text_raw)
+        # TODO: parse the education section better
 
         # extract name
         try:
@@ -73,6 +75,8 @@ class ResumeParser(object):
         except (IndexError, KeyError):
             self.__details['name'] = name
 
+
+        self.__details['raw_text'] = self.__text
         # extract email
         self.__details['email'] = email
 
