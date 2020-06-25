@@ -2,8 +2,12 @@
 
 import io
 import os
+import copy
 import re
 import nltk
+import spacy
+from spacy.tokens import Span
+import dateparser
 import pandas as pd
 import docx2txt
 from datetime import datetime
@@ -17,6 +21,8 @@ from pdfminer.pdfpage import PDFPage
 from pdfminer.pdfparser import PDFSyntaxError
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import stopwords
+
+nlp = spacy.load('en_core_web_sm')
 
 
 def extract_text_from_pdf(pdf_path):
@@ -334,24 +340,67 @@ def extract_email(text):
             return None
 
 
+def expand_person_entities(doc):
+    new_ents = []
+    for ent in doc.ents:
+        # Only check for title if it's a person and not the first token
+        if ent.label_ == "PERSON":
+            if ent.start != 0:
+                # if person preceded by title, include title in entity
+                prev_token = doc[ent.start - 1]
+                if prev_token.text in ("Dr", "Dr.", "Mr", "Mr.", "Ms", "Ms."):
+                    new_ent = Span(doc, ent.start - 1, ent.end, label=ent.label)
+                    new_ents.append(new_ent)
+                else:
+                    # if entity can be parsed as a date, it's not a person
+                    if dateparser.parse(ent.text) is None:
+                        new_ents.append(ent) 
+        else:
+            new_ents.append(ent)
+    doc.ents = new_ents
+    return doc
+
 def extract_name(nlp_text, matcher):
     '''
     Helper function to extract name from spacy nlp text
-
     :param nlp_text: object of `spacy.tokens.doc.Doc`
     :param matcher: object of `spacy.matcher.Matcher`
     :return: string of full name
     '''
-    pattern = [cs.NAME_PATTERN]
+    # try to get the longer name first, then go to two word names
+    person_matcher = copy.deepcopy(matcher)
+    person_matcher.add('PERSON', None, [{"POS": "PERSON"}])
 
-    matcher.add('NAME', None, *pattern)
+    three_matcher = copy.deepcopy(matcher)
+    three_matcher.add('NAME', None, cs.NAME_PATTERN_THREE)
+    three_name = get_names_from_pattern(nlp_text, three_matcher, person_matcher)
+    if three_name is not None:
+        return three_name
+    
+    matcher.add('NAME', None, cs.NAME_PATTERN)
+    return get_names_from_pattern(nlp_text, matcher, person_matcher)
 
+
+def get_names_from_pattern(nlp_text, matcher, person_matcher):
     matches = matcher(nlp_text)
 
-    for _, start, end in matches:
+    for _, start, end in matches[:3]: # name is usually at the top
         span = nlp_text[start:end]
-        if 'name' not in span.text.lower():
-            return span.text
+        # check that is has the proper nouns and matches the regex
+        if 'name' not in span.text.lower() and re.match(r'^[a-zA-Z]{2,40}(?:\s(?:[a-zA-Z]{1,40}))?.?\s[a-zA-Z]{2,40}$', span.text):
+                return span.text  
+
+
+def extract_names(document_text):
+    '''
+    Helper function to extract all names
+    :return: list of strings of names
+    '''
+    import en_core_web_sm
+    nlp = en_core_web_sm.load()                                                                                                                 
+    nlp.add_pipe(expand_person_entities, after='ner')
+    doc = nlp(document_text)
+    return [(ent.text, ent.label_) for ent in doc.ents if ent.label_=='PERSON']
 
 
 def extract_mobile_number(text, custom_regex=None):
@@ -494,3 +543,59 @@ def extract_experience(resume_text):
         if x and 'experience' in x.lower()
     ]
     return x
+
+
+def extract_educational_details(education_list: list) -> list:
+    """
+    Extracts the college names and years
+    """
+    all_items = []
+    empty_seen_map = {
+        "school": False,
+        "degree": False,
+        "years": False,
+    }
+    cur_item = {}
+    cur_seen_map = copy.deepcopy(empty_seen_map)
+    for item in education_list:
+        print(item)
+
+        for school_keyword in cs.SCHOOL_KEYWORDS:
+            if school_keyword.lower() in item.lower():
+                if cur_seen_map["school"] == True:
+                    print("Repeated school", school_keyword)
+                    cur_seen_map = copy.deepcopy(empty_seen_map)
+                    all_items.append(cur_item)
+                    cur_item = {}
+                cur_seen_map["school"] = True
+                cur_item["school"] = item
+                break
+
+        for degree in cs.EDUCATION:
+            if degree in item.upper():
+                if cur_seen_map["degree"] == True:
+                    print("Repeated degree", degree)
+                    cur_seen_map = copy.deepcopy(empty_seen_map)
+                    all_items.append(cur_item)
+                    cur_item = {}
+                cur_seen_map["degree"] = True
+                cur_item["degree"] = item
+                break
+
+        if re.match(r'.*([1-2][0-9]{3})', item):
+            if cur_seen_map["years"] == True:
+                print("Repeated years")
+                cur_seen_map = copy.deepcopy(empty_seen_map)
+                all_items.append(cur_item)
+                cur_item = {}
+            cur_seen_map["years"] = True
+            cur_item["years"] = item
+
+        print(cur_item, cur_seen_map)
+
+    if len(cur_item):
+        all_items.append(cur_item)
+    
+    return all_items
+
+

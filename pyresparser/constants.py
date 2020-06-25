@@ -2,14 +2,17 @@ from nltk.corpus import stopwords
 
 # Omkar Pathak
 NAME_PATTERN = [{'POS': 'PROPN'}, {'POS': 'PROPN'}]
+NAME_PATTERN_THREE = [{'POS': 'PROPN'}, {'POS': 'PROPN'}, {'POS': 'PROPN'}]
 
 # Education (Upper Case Mandatory)
 EDUCATION = [
-            'BE', 'B.E.', 'B.E', 'BS', 'B.S', 'ME', 'M.E',
-            'M.E.', 'MS', 'M.S', 'BTECH', 'MTECH', "MASTER", "MASTERS",
+            'BACHELOR', 'B.E.', 'B.E', 'BS', 'B.S', 'M.E',
+            'M.E.', 'M.S.', 'M.S', 'BTECH', 'MTECH', "MASTER", "MASTERS",
             "PHD", "PH.D.", "P.H.D.", "DOCTORATE",
             'SSC', 'HSC', 'CBSE', 'ICSE', 'X', 'XII'
         ]
+
+SCHOOL_KEYWORDS = ['Hospital', 'University', 'Institute', 'School', 'School', 'Academy', "Center", "College"]
 
 NOT_ALPHA_NUMERIC = r'[^a-zA-Z\d]'
 
@@ -40,6 +43,7 @@ RESUME_SECTIONS_PROFESSIONAL = [
                 ]
 
 RESUME_SECTIONS_GRAD = [
+                    'awards',
                     'accomplishments',
                     'experience',
                     'education',

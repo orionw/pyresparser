@@ -8,7 +8,6 @@ import pprint
 from spacy.matcher import Matcher
 from . import utils
 
-
 class ResumeParser(object):
 
     def __init__(
@@ -55,6 +54,7 @@ class ResumeParser(object):
         cust_ent = utils.extract_entities_wih_custom_model(
                             self.__custom_nlp
                         )
+        # name = utils.extract_name(self.__text)
         name = utils.extract_name(self.__nlp, matcher=self.__matcher)
         email = utils.extract_email(self.__text)
         mobile = utils.extract_mobile_number(self.__text, self.__custom_regex)
@@ -67,6 +67,10 @@ class ResumeParser(object):
         #               [sent.string.strip() for sent in self.__nlp.sents]
         #       )
         entities = utils.extract_entity_sections_grad(self.__text_raw)
+        education = utils.extract_educational_details(entities["education"])
+        
+        print(entities)
+        import pdb; pdb.set_trace()
         # TODO: parse the education section better
 
         # extract name
@@ -77,13 +81,8 @@ class ResumeParser(object):
 
 
         self.__details['raw_text'] = self.__text
-        # extract email
         self.__details['email'] = email
-
-        # extract mobile number
         self.__details['mobile_number'] = mobile
-
-        # extract skills
         self.__details['skills'] = skills
 
         # extract college name
